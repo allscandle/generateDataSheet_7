@@ -1,0 +1,192 @@
+Option Explicit
+
+Private Const INSERT_HEADER_NAME = "time[sec]"
+Private Const OFFSET_ROW_NM = 10
+Private m_active_ws As Worksheet
+Private m_hear_arr_var As Variant
+Private m_last_column_lng As Long
+Private m_last_row_lng As Long
+Private m_row_offset_lng As Long
+'***********************************************************
+' 機能   : コンストラクタ
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Private Sub Class_Initialize()
+    m_row_offset_lng = OFFSET_ROW_NM
+End Sub
+'***********************************************************
+' 機能   : コンストラクタ(引数あり)
+' 引数   : 列を識別する文字列 String
+' 戻り値 : なし
+'***********************************************************
+Public Function funcInit(ByVal sheet_name_str As String)
+    Set m_active_ws = ThisWorkbook.Worksheets(sheet_name_str)
+    m_last_column_lng = cmn_getLastColumnNm(2, m_active_ws)
+    m_last_row_lng = cmn_getLastRowNm(1, m_active_ws)
+    m_hear_arr_var = funcGetHeaderITem
+End Function
+'***********************************************************
+' 機能   : ワークシートオブジェクト（追加したワークシート）を取得する
+' 引数   : なし
+' 戻り値 : ワークシートオブジェクト Worksheet
+'***********************************************************
+Public Function funcGetThisWorkSheet() As Worksheet
+    Set funcGetThisWorkSheet = m_active_ws
+End Function
+'***********************************************************
+' 機能   : データ範囲の開始列番号を取得する
+' 引数   : なし
+' 戻り値 : データ範囲の開始列番号 Long
+'***********************************************************
+Private Property Get funcGetFirstColmunNm() As Long
+    Dim last_colmun_lng As Long
+    Dim first_colmun_lng As Long
+
+    last_colmun_lng = lastColmunNm()
+    
+    Dim i As Long
+    For i = last_colmun_lng To 1 Step -1
+        If m_active_ws.Cells(2, i).Value = "time" Then
+            first_colmun_lng = Cells(2, i).Column
+            funcGetFirstColmunNm = first_colmun_lng
+            Exit For
+        End If
+    Next i
+End Property
+'***********************************************************
+' 機能   : データ範囲の最終列番号を取得する
+' 引数   : なし
+' 戻り値 : データ範囲の最終列番号
+'***********************************************************
+Public Property Get lastColmunNm() As Long
+    lastColmunNm = m_last_column_lng
+End Property
+'***********************************************************
+' 機能   : ヘッダーアイテムを取得する
+' 引数   : なし
+' 戻り値 : ヘッダーアイテムの配列 Variant
+'***********************************************************
+Public Function funcGetHeaderITem() As Variant
+    With m_active_ws
+        funcGetHeaderITem = .Range(.Cells(2, 1), .Cells(2, m_last_column_lng))
+    End With
+End Function
+'***********************************************************
+' 機能   : セルの表示形式を設定する
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Public Function funcModifyNumberFormat()
+'    '// フォーマットする列を抽出
+    Dim format_nm_lng As Long
+'    Dim i As Long: i = 0
+'    For i = 1 To UBound(m_hear_arr_var, 2)
+'        If m_hear_arr_var(1, i) = "assign1_therm" Then
+'            format_nm_lng = i
+'            Exit For
+'        End If
+'    Next i
+
+    Dim first_colmun As Long
+    first_colmun = funcGetFirstColmunNm
+
+    '// 表示形式を設定する
+    With m_active_ws
+        .Range(.Cells(2, funcGetFirstColmunNm + 1), .Cells(m_last_row_lng, first_colmun + 1)).NumberFormatLocal = "yyyy/m/d"
+    End With
+    
+End Function
+'***********************************************************
+' 機能   : 追加するアイテムをシートに出力
+' 引数   : 追加するアイテム String
+' 戻り値 : なし
+'***********************************************************
+Public Function funcExport(ByRef check_status_var As Variant)
+    Dim i As Long
+    For i = 0 To UBound(check_status_var)
+        m_active_ws.Cells(2, (m_last_column_lng + 1) + i).Value = check_status_var(i)
+    Next i
+End Function
+'***********************************************************
+' 機能   : セルのプロパティを設定する
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Public Function funcModifyProperty()
+
+
+    Debug.Print "--------funcModifyProperty--------"; m_last_column_lng
+    
+    Dim first_colmun As Long
+    first_colmun = funcGetFirstColmunNm
+
+    With m_active_ws
+'        '//表全体に格子状の罫線を引く
+'        .Range(.Cells(1, 1), .Cells(1, m_last_column_lng)).CurrentRegion.Borders.LineStyle = xlContinuous
+'        '//セル幅を調整する
+'        .Range(.Cells(1, 1), .Cells(1, m_last_column_lng)).EntireColumn.AutoFit
+
+        '//表全体に格子状の罫線を引く
+        .Range(.Cells(2, first_colmun), .Cells(2, m_last_column_lng)).CurrentRegion.Borders.LineStyle = xlContinuous
+        '//セル幅を調整する
+        .Range(.Cells(2, first_colmun), .Cells(2, m_last_column_lng)).EntireColumn.AutoFit
+        
+    End With
+End Function
+'***********************************************************
+' 機能   : 行の挿入
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Public Function funcModifyInsertRows()
+    m_active_ws.rows(1 & ":" & m_row_offset_lng).Insert
+    '// メンバー変数に挿入数を追加
+    m_last_row_lng = m_last_row_lng + m_row_offset_lng
+End Function
+'***********************************************************
+' 機能   : 列の挿入(B列)
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Public Function funcModifyInsertColumns()
+    Dim arr_var() As Variant, val_var As Variant
+    Dim i As Long: i = 0
+
+    m_active_ws.Columns(2).Insert '// B列に挿入
+
+    ReDim arr_var(m_last_row_lng - 1)
+
+    For Each val_var In arr_var
+        If i = 0 Then
+            m_active_ws.Cells(i + 1, 2) = INSERT_HEADER_NAME
+        Else
+            m_active_ws.Cells(i + 1, 2) = i - 1
+        End If
+        i = i + 1
+    Next val_var
+
+    '// メンバ変数に列数を追加
+    m_last_column_lng = m_last_column_lng + 1
+End Function
+'***********************************************************
+' 機能   : セルの参照を追加
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Public Function funcModifyReferenceCell(ByRef check_status_var As Variant)
+    Dim i As Long
+    For i = 0 To UBound(check_status_var)
+        If check_status_var(i) = "表中央" Then
+            Debug.Print "i = " & i & " check_status_var(i) = " & check_status_var(i)
+            m_active_ws.Cells(2 + m_row_offset_lng, (m_last_column_lng + 1) + i).Formula = "=" & m_active_ws.Cells(4, 4).Address
+            m_active_ws.Cells(m_active_ws.Cells(rows.count, 1).End(xlUp).Row, (m_last_column_lng + 1) + i).Formula = "=" & m_active_ws.Cells(4, 5).Address
+        End If
+        If check_status_var(i) = "表左上" Then
+            Debug.Print "i = " & i & " check_status_var(i) = " & check_status_var(i)
+            m_active_ws.Cells(2 + m_row_offset_lng, (m_last_column_lng + 1) + i).Formula = "=" & m_active_ws.Cells(5, 4).Address
+            m_active_ws.Cells(m_active_ws.Cells(rows.count, 1).End(xlUp).Row, (m_last_column_lng + 1) + i).Formula = "=" & m_active_ws.Cells(5, 5).Address
+        End If
+    Next i
+End Function
+

@@ -1,0 +1,180 @@
+Option Explicit
+
+Private Const LOGGER = "logger"
+Private Const ADD = "add"
+Public Const CHECK_ON = "check_on"
+Public Const CHECK_OFF = "check_off"
+'***********************************************************
+' 機能   : "Exection"ボタンのクリックイベント
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Sub eventBtnClick_Exec()
+    Dim mapping_logger_class As New MappingSheet4
+    Dim input_name_str As String
+    mapping_logger_class.funcInit ("logger")
+    input_name_str = mapping_logger_class.funcGetInputSheetName
+    
+    '// シート名の入力をチェック
+    If input_name_str = "" Then
+        MsgBox "シート名を入力してください。" & vbCrLf & "処理を中断します。", vbExclamation
+        Exit Sub
+    End If
+
+    '// チェックボックスの状態をチェック
+    Dim check_status_arr_str() As String
+    check_status_arr_str() = mapping_logger_class.funcGetCheckBoxStatus()
+    If IsArrayEx(check_status_arr_str) = 0 Then
+        MsgBox "チェックボックスを選択していません。" & vbCrLf & "処理を中断します。", vbExclamation
+        Exit Sub
+    End If
+
+    '// シート名の重複チェック
+    Dim ws As Worksheet
+    For Each ws In Worksheets
+        If ws.Name = input_name_str Then
+            MsgBox "シート名が重複しています。" & vbCrLf & "処理を中断します。", vbExclamation
+            Exit Sub
+        End If
+    Next ws
+    
+    Call mainProcess
+    
+    Set mapping_logger_class = Nothing
+End Sub
+'***********************************************************
+' 機能   : チェックONボタンのクリックイベント
+' 引数   : 列を識別する文字列 String
+' 戻り値 : なし
+'***********************************************************
+Sub eventBtnClick_CheckOn(ByVal item_str As String)
+    Dim mapping_class As New MappingSheet4
+    mapping_class.funcInit (item_str)
+
+    Call mapping_class.funcAllOnOffCheckBoxes(CHECK_ON)
+    Set mapping_class = Nothing
+
+End Sub
+'***********************************************************
+' 機能   : チェックOFFボタンのクリックイベント
+' 引数   : 列を識別する文字列 String
+' 戻り値 : なし
+'***********************************************************
+Sub eventBtnClick_CheckOff(ByVal item_str As String)
+    Dim mapping_class As New MappingSheet4
+    mapping_class.funcInit (item_str)
+
+    Call mapping_class.funcAllOnOffCheckBoxes(CHECK_OFF)
+    Set mapping_class = Nothing
+
+End Sub
+'***********************************************************
+' 機能   : (デバッグモード)"更新"ボタンのクリックイベント
+' 引数   : 列を識別する文字列 String
+' 戻り値 : なし
+'***********************************************************
+Sub eventBtnClick_DevUpdate(ByVal item_str As String)
+
+    Dim arr_str() As String
+
+    '// シートが保護されている場合は処理を抜ける
+    If funcIsWorkSheetRocked() = True Then
+        Exit Sub
+    End If
+
+    Dim mapping_class4 As New MappingSheet4
+    Dim mapping_class5 As New MappingSheet5
+    mapping_class4.funcInit (item_str)
+    mapping_class5.funcInit (item_str)
+
+    Call mapping_class4.funcDevAllClear
+
+    Dim index_lng As Long
+    index_lng = (mapping_class5.m_last_row_lng - mapping_class5.m_start_row_lng)
+    Call mapping_class5.funcGenerateArray(arr_str, index_lng)
+
+
+    Application.ScreenUpdating = False
+
+    Call mapping_class4.funcDevUpdate(arr_str)
+    
+    Set mapping_class4 = Nothing
+    Set mapping_class5 = Nothing
+
+    Application.ScreenUpdating = True
+
+End Sub
+'***********************************************************
+' 機能   : (デバッグモード)"クリア"ボタンのクリックイベント
+' 引数   : 列を識別する文字列 String
+' 戻り値 : なし
+'***********************************************************
+Sub eventBtnClick_DevClear(ByVal item_str As String)
+
+    '// シートロック場合、処理を抜ける
+    If funcIsWorkSheetRocked() = True Then
+        Exit Sub
+    End If
+
+    Application.ScreenUpdating = False
+
+    Dim mapping_class As New MappingSheet4
+    mapping_class.funcInit (item_str)
+
+    Call mapping_class.funcDevAllClear
+    Set mapping_class = Nothing
+    
+    Application.ScreenUpdating = True
+    
+End Sub
+'***********************************************************
+' 機能   : チェックボックスの状態をリンクしたセルに返す
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Sub チェック1_Click()
+    'チェックボックスの1つ右に0か-1を返す
+    With ActiveSheet.Shapes(Application.Caller).TopLeftCell.Offset(0, 2)
+    .Value = Not .Value
+    End With
+
+End Sub
+'***********************************************************
+' 機能   : オプションボタンの状態をリンクしたセルに返す
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Sub eventHandler_OptionLink()
+    Dim m_active_ws As Worksheet
+    Set m_active_ws = ThisWorkbook.Worksheets("4.Setting&Exec")
+    
+    Dim option_text_str As String
+    option_text_str = m_active_ws.Shapes(Application.Caller).AlternativeText
+
+    Select Case option_text_str
+        Case " Clycle1"
+            m_active_ws.Cells(22, 3) = 1
+        Case " Cycle2"
+            m_active_ws.Cells(22, 3) = 2
+        Case " Cycle3"
+            m_active_ws.Cells(22, 3) = 3
+        Case Else
+            Exit Sub
+    End Select
+End Sub
+'***********************************************************
+' 機能   : ワークシートの保護機能をチェックする
+' 引数   : なし
+' 戻り値 : True:ロック/False:アンロック
+'***********************************************************
+Private Function funcIsWorkSheetRocked() As Boolean
+    If ActiveSheet.ProtectContents = True Then
+        MsgBox "ワークシートはロックされています。" _
+                & vbCrLf & "処理を実行するにはワークシートをアンロックしてください。" _
+                , vbExclamation
+        funcIsWorkSheetRocked = True
+        Exit Function
+    End If
+    
+    funcIsWorkSheetRocked = False
+End Function

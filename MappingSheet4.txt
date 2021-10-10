@@ -1,0 +1,208 @@
+Option Explicit
+
+Public Enum logger_header_nm_em
+    CHECK_COLM = 2
+    ITEM_COLM = 3
+    CHECK_ISVALID_COLM = 4
+End Enum
+
+Public Enum add_header_nm_em
+    CHECK_COLM = 8
+    ITEM_COLM = 9
+    CHECK_ISVALID_COLM = 10
+End Enum
+
+Private Const DEFALT_NM = 1
+Private Const START_ROW_NM = 6
+
+'// loger/append itemを識別するフラグと追加
+Private m_is_append_item As Boolean
+Private m_active_ws As Worksheet
+Private m_cmn_input_ws_name_str As String
+Public m_start_row_lng As Long
+Public m_check_colm_lng As Long
+Public m_item_colm_lng As Long
+Public m_check_isvalid_colm_lng As Long
+Public m_check_count_lng As Long
+'***********************************************************
+' 機能   : コンストラクタ
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Private Sub Class_Initialize()
+    Set m_active_ws = ThisWorkbook.Worksheets("4.Setting&Exec")
+    
+    '// loger/append itemを識別するフラグと追加
+    m_is_append_item = False
+
+    m_start_row_lng = START_ROW_NM
+    m_check_colm_lng = DEFALT_NM
+    m_item_colm_lng = DEFALT_NM
+    m_check_isvalid_colm_lng = DEFALT_NM
+    m_check_count_lng = 0
+    m_cmn_input_ws_name_str = m_active_ws.Cells(19, 3).Value
+End Sub
+'***********************************************************
+' 機能   : コンストラクタ(引数あり)
+' 引数   : 列を識別する文字列 String
+' 戻り値 : なし
+'***********************************************************
+Public Function funcInit(ByVal itme_name_str As String)
+    Select Case itme_name_str
+        Case "logger"
+            '// loger/append itemを識別するフラグと追加
+            m_is_append_item = False
+
+            m_check_colm_lng = logger_header_nm_em.CHECK_COLM
+            m_item_colm_lng = logger_header_nm_em.ITEM_COLM
+            m_check_isvalid_colm_lng = logger_header_nm_em.CHECK_ISVALID_COLM
+            m_check_count_lng = m_active_ws.Cells(3, 4).Value
+        Case "add"
+            '// loger/append itemを識別するフラグと追加
+            m_is_append_item = True
+
+            m_check_colm_lng = add_header_nm_em.CHECK_COLM
+            m_item_colm_lng = add_header_nm_em.ITEM_COLM
+            m_check_isvalid_colm_lng = add_header_nm_em.CHECK_ISVALID_COLM
+            m_check_count_lng = m_active_ws.Cells(3, 10).Value
+        Case Else
+            '// Do Nothing
+    End Select
+End Function
+'***********************************************************
+' 機能   : ワークシートオブジェクト（シート4）を取得する
+' 引数   : なし
+' 戻り値 : ワークシートオブジェクト Worksheet
+'***********************************************************
+Public Function funcGetThisWorkSheet() As Worksheet
+    Set funcGetThisWorkSheet = m_active_ws
+End Function
+'***********************************************************
+' 機能   : 入力したシート名を取得する
+' 引数   : なし
+' 戻り値 : 入力したシート名 String
+'***********************************************************
+Public Function funcGetInputSheetName() As String
+    funcGetInputSheetName = m_cmn_input_ws_name_str
+End Function
+'***********************************************************
+' 機能   : チェックボックスの状態を全てON/OFFする
+' 引数   : 列を識別する文字列 String
+' 戻り値 : なし
+'***********************************************************
+Public Function funcAllOnOffCheckBoxes(ByVal switch As String)
+    Dim checkbox As Excel.checkbox
+    Dim is_on_flg_str As String, is_on_val_var As Variant
+    Select Case switch
+        Case CHECK_ON
+            is_on_flg_str = True
+            is_on_val_var = xlOn
+        Case CHECK_OFF
+            is_on_flg_str = False
+            is_on_val_var = xlOff
+        Case Else
+    End Select
+    
+    Dim i As Long: i = 0
+    For Each checkbox In m_active_ws.CheckBoxes
+        If Not Intersect(checkbox.TopLeftCell, Columns(m_check_colm_lng)) Is Nothing Then
+            checkbox.Value = is_on_val_var
+            m_active_ws.Cells(m_start_row_lng + i, m_check_isvalid_colm_lng).Value = is_on_flg_str
+            i = i + 1
+        End If
+    Next
+End Function
+'***********************************************************
+' 機能   : (デバッグモード)B-C列にシート"5.ItemSelect"のデータを反映する
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Public Function funcDevUpdate(ByRef arr_str() As String)
+    Dim i As Long
+    For i = 0 To UBound(arr_str)
+        m_active_ws.Cells(m_start_row_lng + i, m_check_colm_lng).Select
+        m_active_ws.CheckBoxes.ADD(Selection.Left, Selection.Top, Selection.Width, Selection.Height).Select
+
+        Selection.Characters.Text = ""
+        Selection.OnAction = "チェック1_Click"
+        'Selection.LinkedCell = Selection.TopLeftCell.Offset(0, 2).Address
+        
+        m_active_ws.Cells(m_start_row_lng + i, m_item_colm_lng).Value = arr_str(i)
+        m_active_ws.Cells(m_start_row_lng + i, m_check_isvalid_colm_lng).Value = "False"
+    Next i
+End Function
+'***********************************************************
+' 機能   : (デバッグモード)B-C列の値を全て削除する
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Public Function funcDevAllClear()
+    Dim checkbox As Excel.checkbox
+    Dim i As Long: i = 0
+
+    For Each checkbox In m_active_ws.CheckBoxes
+        If Not Intersect(checkbox.TopLeftCell, Columns(m_check_colm_lng)) Is Nothing Then
+            checkbox.Delete
+
+            m_active_ws.Cells(m_start_row_lng + i, m_check_colm_lng).Clear
+            m_active_ws.Cells(m_start_row_lng + i, m_item_colm_lng).Clear
+            m_active_ws.Cells(m_start_row_lng + i, m_check_isvalid_colm_lng).Clear
+            i = i + 1
+        End If
+    Next
+End Function
+'***********************************************************
+' 機能   : チェックボックスの状態を取得する
+' 引数   : なし
+' 戻り値 : チェックボックが有効なアイテム 配列
+'***********************************************************
+Public Function funcGetCheckBoxStatus() As String()
+    Dim check_range_var As Variant
+    Dim check_cnt_lng As Long
+    Dim arr_str() As String
+
+    With m_active_ws
+        '// Variant型で定義した配列にセル範囲を格納
+        '// 1次元目:アイテム
+        '// 2次元目:チェック可否
+        check_range_var = .Range(.Cells(m_start_row_lng, m_item_colm_lng), .Cells(.Cells(rows.count, m_check_isvalid_colm_lng).End(xlUp).Row, m_check_isvalid_colm_lng)).Value
+        '// チェック数の取得
+        check_cnt_lng = m_check_count_lng
+
+        If check_cnt_lng = 0 Then
+            funcGetCheckBoxStatus = arr_str()
+            Exit Function
+        End If
+        
+        ReDim arr_str((check_cnt_lng + 2) - 1)
+        Dim i As Integer: i = 0
+        Dim j As Integer: j = 0
+        For i = 1 To UBound(check_range_var, 1)
+        
+            If m_is_append_item = False Then
+                '// A列は"time"で固定
+                If j = 0 Then
+                    arr_str(j) = "time"
+                    j = j + 1
+                ElseIf j = 1 Then
+                '// B列は"time[sec]"で固定
+                    arr_str(j) = "time[sec]"
+                    j = j + 1
+                ElseIf check_range_var(i, 2) = True Then
+                    arr_str(j) = check_range_var(i, 1)
+                    j = j + 1
+                Else
+                    '// DoNothing
+                End If
+            Else
+                If check_range_var(i, 2) = True Then
+                    arr_str(j) = check_range_var(i, 1)
+                    j = j + 1
+                End If
+            End If
+            
+        Next i
+    End With
+    
+    funcGetCheckBoxStatus = arr_str()
+End Function

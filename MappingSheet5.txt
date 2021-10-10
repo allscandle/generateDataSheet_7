@@ -1,0 +1,63 @@
+Option Explicit
+
+Public m_start_row_lng As Long
+Public m_last_row_lng As Long
+Public m_header_lng As Long
+Private m_active_ws As Worksheet
+
+Private Const DEFALT_NM = 1
+Private Const ROW_NM = 6
+Private Const LOGGER_HEADER_COLM_NM = 4
+Private Const ADD_HEADR_COLM_NM = 5
+'***********************************************************
+' 機能   : コンストラクタ
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Private Sub Class_Initialize()
+    m_start_row_lng = ROW_NM
+    m_header_lng = DEFALT_NM
+    m_last_row_lng = DEFALT_NM
+    Set m_active_ws = ThisWorkbook.Worksheets("5.ItemSelect")
+End Sub
+'***********************************************************
+' 機能   : コンストラクタ(引数あり)
+' 引数   : 列を識別する文字列 String
+' 戻り値 : なし
+'***********************************************************
+Public Function funcInit(ByVal itme_name_str As String)
+    Select Case itme_name_str
+        Case "logger"
+            m_header_lng = LOGGER_HEADER_COLM_NM
+            m_last_row_lng = m_active_ws.Cells(rows.count, m_header_lng).End(xlUp).Row
+        Case "add"
+            m_header_lng = ADD_HEADR_COLM_NM
+            m_last_row_lng = m_active_ws.Cells(rows.count, m_header_lng).End(xlUp).Row
+        Case Else
+            '// Do Nothing
+    End Select
+End Function
+'***********************************************************
+' 機能   : ワークシートオブジェクト（シート5）を取得する
+' 引数   : なし
+' 戻り値 : ワークシートオブジェクト Worksheet
+'***********************************************************
+Public Function funcGetThisWorkSheet() As Worksheet
+    Set funcGetThisWorkSheet = m_active_ws
+End Function
+
+'***********************************************************
+' 機能   : 列データを配列に格納する
+' 引数   : 配列(参照) string, インデックス long
+' 戻り値 : なし
+'***********************************************************
+Public Function funcGenerateArray(ByRef arr_str() As String, ByVal index_lng As Long)
+    ReDim arr_str(index_lng)
+    Dim i As Long
+    For i = 0 To index_lng
+        If m_active_ws.Cells(i + m_start_row_lng, m_header_lng).Value = "" Then
+            '// Do Nothing
+        End If
+        arr_str(i) = m_active_ws.Cells(i + m_start_row_lng, m_header_lng).Value
+    Next i
+End Function

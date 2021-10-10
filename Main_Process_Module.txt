@@ -1,0 +1,233 @@
+Option Explicit
+'***********************************************************
+' 機能   : Mainプロシージャ
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Public Sub mainProcess()
+    '// CSVファイルを読み込んで、新規シートにデータ変換
+    Call convertToExcelFormat
+
+    '// 変換したデータを編集する
+'    Call modifyAppendData
+
+    '// アクティブシートを元に戻す
+    Dim mapping_add_class As New MappingSheet4
+    mapping_add_class.funcGetThisWorkSheet.Activate
+
+    Set mapping_add_class = Nothing
+End Sub
+'***********************************************************
+' 機能   : 最終行の行番号を取得
+' 引数   : 列番号 Long / ワークシートオブジェクト Worksheet
+' 戻り値 : 最終行の行番号 Long
+'***********************************************************
+Public Function cmn_getLastRowNm(ByVal column_nm_lng As Long, ByVal ws As Worksheet) As Long
+    cmn_getLastRowNm = ws.Cells(rows.count, column_nm_lng).End(xlUp).Row
+End Function
+'***********************************************************
+' 機能   : 最終列の列番号を取得
+' 引数   : 行番号 Long / ワークシートオブジェクト Worksheet
+' 戻り値 : 最終列の列番号 Long
+'***********************************************************
+Public Function cmn_getLastColumnNm(ByVal row_nm_lng As Long, ByVal ws As Worksheet) As Long
+    cmn_getLastColumnNm = ws.Cells(row_nm_lng, Columns.count).End(xlToLeft).Column
+End Function
+'***********************************************************
+' 機能   : 引数が配列か判定し、配列の場合は空かどうかも判定する
+' 引数   : varArray  配列
+' 戻り値 : 判定結果（1:配列/0:空の配列/-1:配列じゃない）
+' 参照   : http://www.openreference.org/articles/view/583
+'***********************************************************
+Public Function IsArrayEx(varArray As Variant) As Long
+On Error GoTo ERROR_
+
+    If IsArray(varArray) Then
+        IsArrayEx = IIf(UBound(varArray) >= 0, 1, 0)
+    Else
+        IsArrayEx = -1
+    End If
+
+    Exit Function
+
+ERROR_:
+    If Err.Number = 9 Then
+        IsArrayEx = 0
+    End If
+End Function
+'***********************************************************
+' 機能   : ヘッダーアイテムの2列目に"time[sec]"を追加する
+' 引数   : ヘッダー項目 配列、ヘッダー項目のIndex Long
+' 戻り値 : "time[sec]"を追加したヘッダー項目の配列
+'***********************************************************
+Private Function insertArray(ByRef arr_var As Variant, ByVal index_lng As Long) As Variant
+    Dim ret_arr As Variant
+    ret_arr = arr_var
+
+    ReDim Preserve ret_arr(UBound(ret_arr) + 1)
+
+    Dim i As Long
+    For i = UBound(ret_arr) To 1 + 1 Step -1
+        ret_arr(i) = ret_arr(i - 1)
+    Next i
+    
+    If index_lng = 0 Then
+        ret_arr(1) = "time[sec]"
+    Else
+        ret_arr(1) = index_lng - 1
+    End If
+    
+    insertArray = ret_arr
+
+End Function
+'***********************************************************
+' 機能   : CSVファイルを読み込んで、新規シートにデータ変換
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Private Function convertToExcelFormat()
+    '// ファイルを開くダイアログ
+    Dim file_name_var As Variant
+    file_name_var = Application.GetOpenFilename(FileFilter:="Csvファイル,*.csv*", MultiSelect:=True)
+
+    Dim file_var As Variant
+    Dim f_num As Long: f_num = 0
+    Dim f_last_colmun_num_lng As Long: f_last_colmun_num_lng = 0
+    Dim f_colmun_offset_num_lng As Long: f_colmun_offset_num_lng = 0
+    Dim f_refdata_addra As Long
+    
+    For Each file_var In file_name_var
+        If file_var = False Then
+            Exit Function
+        End If
+    
+        '// ファイルオープン
+        Open file_var For Input As #1
+
+        Dim mapping_logger_class As New MappingSheet4
+        Dim input_name_str As String
+        mapping_logger_class.funcInit ("logger")
+        input_name_str = mapping_logger_class.funcGetInputSheetName
+
+        '// チェックボックの状態を取得
+        Dim check_status_arr_str() As String
+        check_status_arr_str() = mapping_logger_class.funcGetCheckBoxStatus()
+
+        If f_num = 0 Then
+            '// データを書き込むシート追加する
+            Worksheets.ADD After:=Worksheets(Worksheets.count)
+            ActiveSheet.Name = input_name_str
+        End If
+
+        '// CSVファイルから1行毎に読み出してセルへ書き出し処理を行う
+        Dim rows_str As String
+        Dim is_header As Boolean
+        Dim header_arr_var As Variant, row_arr_var, row_vbLf_arr_var
+
+        Dim mapping_append_class As New MappingNewSheet
+        Dim active_ws As Worksheet
+        mapping_append_class.funcInit (input_name_str)
+
+        Set active_ws = mapping_append_class.funcGetThisWorkSheet
+
+        f_last_colmun_num_lng = mapping_append_class.lastColmunNm
+    
+        '// ファイルごとのループで最終列を取得する
+        Dim n As Long
+        Do Until EOF(1)
+            Line Input #1, rows_str
+        
+            '// rows_streをLFコードで区切りrow_arr_varに格納
+            row_vbLf_arr_var = Split(rows_str, vbLf)
+            
+            '// 1行づつ処理する
+            For n = 0 To UBound(row_vbLf_arr_var) - 1
+
+                '// ダブルクォーテーションをはずす
+                row_arr_var = Split(Replace(row_vbLf_arr_var(n), """", ""), ",")
+
+                ReDim Preserve row_arr_var(UBound(row_arr_var) + 1)
+                Dim vArray_var As Variant, v_var
+                vArray_var = insertArray(row_arr_var, n)
+
+                '// データがヘッダーの場合
+                If isHeader(n) = True Then
+                    header_arr_var = vArray_var
+                End If
+
+                '// チェックボックスのON状態とCSVパラメータが完全一致を判定する
+                Dim i As Integer, j As Integer, k As Integer: k = 0
+                For i = 0 To UBound(check_status_arr_str)
+                    For j = 0 To UBound(header_arr_var)
+                    
+                        If check_status_arr_str(i) = header_arr_var(j) Then
+                            If f_num = 0 Then
+                                active_ws.Cells(2 + n, 1 + k).Value = vArray_var(j)
+                            Else
+                                active_ws.Cells(2 + n, 1 + (f_last_colmun_num_lng + 1) + k).Value = vArray_var(j)
+                            End If
+                            k = k + 1
+                        End If
+                    Next j
+                Next i
+            Next n
+        Loop
+        Close #1
+
+        Set mapping_append_class = Nothing
+        Set mapping_logger_class = Nothing
+
+        Call modifyAppendData
+
+        f_num = f_num + 1
+    Next file_var
+
+End Function
+'***********************************************************
+' 機能   : 追加したデータを編集する
+' 引数   : なし
+' 戻り値 : なし
+'***********************************************************
+Private Sub modifyAppendData()
+
+    '// 新規シートを編集する
+    Dim mapping_add_class As New MappingSheet4
+    Call mapping_add_class.funcInit("add")
+    Dim input_name_str As String
+    input_name_str = mapping_add_class.funcGetInputSheetName
+
+    Dim mapping_new_class As New MappingNewSheet
+    Call mapping_new_class.funcInit(input_name_str)
+
+    If mapping_add_class.m_check_count_lng = 0 Then
+        Call mapping_new_class.funcModifyNumberFormat
+'        Call mapping_new_class.funcModifyInsertColumns
+        Call mapping_new_class.funcModifyProperty
+'        Call mapping_new_class.funcModifyInsertRows
+    Else
+        Dim other_request As Variant
+        Call mapping_new_class.funcModifyNumberFormat
+        other_request = mapping_add_class.funcGetCheckBoxStatus()
+        Call mapping_new_class.funcExport(other_request)
+'        Call mapping_new_class.funcModifyInsertColumns
+        Call mapping_new_class.funcModifyProperty
+'        Call mapping_new_class.funcModifyInsertRows
+'        Call mapping_new_class.funcModifyReferenceCell(other_request)
+    End If
+
+    Set mapping_add_class = Nothing
+    Set mapping_new_class = Nothing
+End Sub
+'***********************************************************
+' 機能   : データが先頭行(ヘッダー)かどうかを判定する
+' 引数   : index 行番号
+' 戻り値 : 判定結果（True:先頭行(ヘッダー)/False:先頭行でない）
+'***********************************************************
+Private Function isHeader(ByVal index As Integer) As Boolean
+    If index <> 0 Then
+        isHeader = False
+    Else
+        isHeader = True
+    End If
+    
+End Function
